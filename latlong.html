@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Google Maps with Street View and Iframe Link</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: row;
+      }
+      .container {
+        display: flex;
+        width: 100%;
+        height: 100vh;
+        padding: 20px;
+        box-sizing: border-box;
+      }
+      .form-container {
+        width: 40%;
+        padding: 20px;
+        background-color: #f9f9f9;
+        box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+        box-sizing: border-box;
+      }
+      .form-container h1 {
+        margin-top: 0;
+        font-size: 24px;
+      }
+      .form-container form {
+        display: flex;
+        flex-direction: column;
+      }
+      .form-container input {
+        margin-bottom: 15px;
+        padding: 10px;
+        font-size: 14px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        width: 95%;
+      }
+      .form-container button {
+        padding: 10px 15px;
+        font-size: 16px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .form-container button:hover {
+        background-color: #0056b3;
+      }
+      #map-container {
+        width: 60%;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding-left: 20px;
+        box-sizing: border-box;
+      }
+      #map {
+        width: 100%;
+        height: 50%;
+        box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+        border-radius: 4px;
+      }
+      #street-view {
+        width: 100%;
+        height: 50%;
+        box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="form-container">
+        <h1>Location Form</h1>
+        <form id="locationForm">
+          <input
+            type="text"
+            id="address"
+            name="address"
+            placeholder="Enter address"
+          />
+          <input
+            type="text"
+            id="locality"
+            name="locality"
+            placeholder="Enter locality"
+            readonly
+          />
+          <input type="text" id="city" name="city" placeholder="Enter city" readonly />
+          <input
+            type="text"
+            id="pincode"
+            name="pincode"
+            placeholder="Enter pincode"
+            readonly
+          />
+          <input
+            type="text"
+            id="country"
+            name="country"
+            placeholder="Enter country"
+            readonly
+          />
+          <input
+            type="text"
+            id="latitude"
+            name="latitude"
+            placeholder="Enter latitude"
+            readonly
+          />
+          <input
+            type="text"
+            id="longitude"
+            name="longitude"
+            placeholder="Enter longitude"
+            readonly
+          />
+          <input
+            type="text"
+            id="streetViewIframe"
+            name="streetViewIframe"
+            placeholder="Street View iframe link"
+            readonly
+          />
+          <button type="button" onclick="updateMap()">Show on Map</button>
+        </form>
+      </div>
+      <div id="map-container">
+        <div id="map"></div>
+        <div id="street-view"></div>
+      </div>
+    </div>
+
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDIRQDHrB5vKPXvhoZDAHLfzLyYdKmAeI4"></script>
+    <script>
+      let map;
+      let marker;
+      let streetViewPanorama;
+
+      function initMap() {
+        const initialPosition = { lat: 0, lng: 0 };
+        map = new google.maps.Map(document.getElementById("map"), {
+          center: initialPosition,
+          zoom: 2,
+        });
+
+        marker = new google.maps.Marker({
+          position: initialPosition,
+          map: map,
+        });
+
+        streetViewPanorama = new google.maps.StreetViewPanorama(
+          document.getElementById("street-view"),
+          {
+            position: initialPosition,
+            pov: { heading: 0, pitch: 0 },
+            zoom: 1,
+          }
+        );
+
+        map.setStreetView(streetViewPanorama);
+
+        streetViewPanorama.addListener(
+          "position_changed",
+          updateStreetViewLink
+        );
+        streetViewPanorama.addListener("pov_changed", updateStreetViewLink);
+      }
+
+      function updateMap() {
+        const address = document.getElementById("address").value;
+        const geocoder = new google.maps.Geocoder();
+
+        geocoder.geocode({ address: address }, (results, status) => {
+          if (status === "OK") {
+            const location = results[0].geometry.location;
+            const position = {
+              lat: location.lat(),
+              lng: location.lng(),
+            };
+
+            updateMapAndStreetView(position);
+            fillAddressDetails(results[0]);
+
+            document.getElementById("latitude").value = position.lat;
+            document.getElementById("longitude").value = position.lng;
+          } else {
+            alert("Geocode was not successful: " + status);
+          }
+        });
+      }
+
+      function fillAddressDetails(result) {
+        const addressComponents = result.address_components;
+        let locality = "",
+          city = "",
+          country = "",
+          pincode = "";
+
+        addressComponents.forEach((component) => {
+          if (component.types.includes("locality")) {
+            locality = component.long_name;
+          }
+          if (component.types.includes("administrative_area_level_1")) {
+            city = component.long_name;
+          }
+          if (component.types.includes("country")) {
+            country = component.long_name;
+          }
+          if (component.types.includes("postal_code")) {
+            pincode = component.long_name;
+          }
+        });
+
+        document.getElementById("locality").value = locality;
+        document.getElementById("city").value = city;
+        document.getElementById("country").value = country;
+        document.getElementById("pincode").value = pincode;
+      }
+
+      function updateMapAndStreetView(position) {
+        map.setCenter(position);
+        map.setZoom(14);
+        marker.setPosition(position);
+
+        streetViewPanorama.setPosition(position);
+        streetViewPanorama.setPov({ heading: 0, pitch: 0 });
+
+        updateStreetViewLink();
+      }
+
+      function updateStreetViewLink() {
+        const position = streetViewPanorama.getPosition();
+        const pov = streetViewPanorama.getPov();
+        const lat = position.lat();
+        const lng = position.lng();
+        const heading = pov.heading;
+        const pitch = pov.pitch;
+
+        const iframeLink = `<iframe src="https://www.google.com/maps/embed?pb=!4v${Date.now()}!6m8!1m7!1s!2m2!1d${lat}!2d${lng}!3f${heading}!4f${pitch}!5f0.7820865974627469" width="400" height="300" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>`;
+
+        document.getElementById("streetViewIframe").value = iframeLink;
+      }
+
+      window.onload = initMap;
+    </script>
+  </body>
+</html>
